@@ -1,19 +1,22 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { TextField, Button } from "@mui/material"
 import Image from "next/image"
+import { uploadFileToFirebase } from "@/utils/uploadToFirebase" // ← 追加
 
 export default function Page() {
   const [roomImage, setRoomImage] = useState<string | null>(null)
   const [resultImage, setResultImage] = useState<string | null>(null)
   const [prompt, setPrompt] = useState("")
+  const [file, setFile] = useState<File | null>(null) // ← file保持用
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
       const file = event.target.files[0]
+      setFile(file)
+
       const reader = new FileReader()
       reader.onload = (e) => {
         if (e.target?.result) {
@@ -24,10 +27,50 @@ export default function Page() {
     }
   }
 
-  const handleSubmit = () => {
-    // ここで実際の処理を行います
-    // デモ用に仮の結果画像を設定
-    setResultImage("/placeholder.svg?height=400&width=400")
+  const handleSubmit = async () => {
+    if (!file || !prompt) {
+      console.error("⚠️ ファイルまたはプロンプトが未設定")
+      return
+    }
+
+
+    try {
+      // FirebaseにアップロードしてURL取得
+      const firebaseUrl = await uploadFileToFirebase(file)
+      console.log("✅ Firebase URL:", firebaseUrl)
+
+      if (!firebaseUrl.startsWith("http")) {
+        console.error("❌ URL形式が不正！", firebaseUrl)
+      }
+      
+
+      // LUW API呼び出し
+      const res = await fetch("/api/luw", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt,
+          imageUrl: firebaseUrl,
+        }),
+      })
+
+      if (!res.ok) {
+        let errorText = ""
+        try {
+          errorText = await res.text()
+        } catch {
+          errorText = "レスポンス本文の取得に失敗"
+        }
+        console.error("❌ エラー:", res.status, errorText)
+        return
+      }
+
+      const { imageUrl } = await res.json()
+      console.log("🎨 LUW生成画像:", imageUrl)
+      setResultImage(imageUrl)
+    } catch (err) {
+      console.error("🔥 アップロード or APIエラー", err)
+    }
   }
 
   return (
@@ -35,17 +78,12 @@ export default function Page() {
       <h1 className="text-4xl font-bold text-amber-500 mb-8">Kiei</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* 左側: 部屋の画像とプロンプト */}
         <div className="border border-red rounded-lg p-6 flex flex-col">
           <h2 className="text-xl mb-4">部屋の画像</h2>
 
           <div className="flex-1 flex items-center justify-center bg-gray-100 rounded-lg mb-4 min-h-[400px]">
             {roomImage ? (
-              <img
-                src={roomImage || "/placeholder.svg"}
-                alt="部屋の画像"
-                className="max-w-full max-h-[400px] object-contain"
-              />
+              <img src={roomImage} alt="部屋の画像" className="max-w-full max-h-[400px] object-contain" />
             ) : (
               <div className="text-center p-4">
                 <label htmlFor="room-image-upload" className="cursor-pointer">
@@ -78,21 +116,20 @@ export default function Page() {
           </div>
         </div>
 
-        {/* 右側: 結果の画像 */}
         <div className="border border-red-300 rounded-lg p-6 flex flex-col">
           <h2 className="text-xl mb-4">結果</h2>
 
           <div className="flex-1 flex items-center justify-center bg-gray-100 rounded-lg min-h-[400px]">
             {resultImage ? (
               <Image
-                src={resultImage || "/placeholder.svg"}
+                src={resultImage}
                 alt="結果画像"
                 width={400}
                 height={400}
                 className="max-w-full max-h-[400px] object-contain"
               />
             ) : (
-              <p className="text-gray-500">試着の結果はこちら</p>
+              <p className="text-gray-500">生成の結果はこちら</p>
             )}
           </div>
         </div>
@@ -109,7 +146,7 @@ export default function Page() {
           }}
           onClick={handleSubmit}
         >
-          試着実行
+          生成実行
         </Button>
       </div>
     </main>
