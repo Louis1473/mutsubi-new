@@ -10,7 +10,8 @@ export default function Page() {
   const [roomImage, setRoomImage] = useState<string | null>(null)
   const [resultImage, setResultImage] = useState<string | null>(null)
   const [prompt, setPrompt] = useState("")
-  const [file, setFile] = useState<File | null>(null) // ← file保持用
+  const [file, setFile] = useState<File | null>(null) 
+  const [btn, setBtn] = useState<boolean>(false)
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
@@ -33,6 +34,7 @@ export default function Page() {
       return
     }
 
+    setBtn(true)
 
     try {
       // FirebaseにアップロードしてURL取得
@@ -70,6 +72,8 @@ export default function Page() {
       setResultImage(imageUrl)
     } catch (err) {
       console.error("🔥 アップロード or APIエラー", err)
+    } finally{
+      setBtn(false)
     }
   }
 
@@ -145,8 +149,9 @@ export default function Page() {
             py: 1,
           }}
           onClick={handleSubmit}
+          disabled={btn}
         >
-          生成実行
+          {btn ? "生成中..." : "生成実行"}
         </Button>
       </div>
     </main>

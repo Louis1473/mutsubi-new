@@ -25,6 +25,8 @@ export async function POST(req: Request) {
     prompt,
     image: imageUrl,
     fill_room: "true",
+    precise: 5,
+    enhance_prompt: "false"
   })
 
   const initRes = await fetch(API_URL, {
